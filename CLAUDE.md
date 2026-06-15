@@ -6,7 +6,7 @@
 
 ## Current Status — June 2026 (updated)
 
-✅ **Intro Splash Section** — NetworkCanvas bg, server-rendered headline with pure-CSS blur-up reveal (LCP-safe), navbar hidden on section 0  
+✅ **Intro Splash Section** — NetworkCanvas bg, server-rendered headline (LCP-safe) with desktop-only JS typewriter / instant on mobile, navbar hidden on section 0  
 ✅ **Hero Section** — 120-particle NetworkCanvas, rotating typewriter eyebrow, two-column layout  
 ✅ **Services Section** — Tech icon grid (real brand icons w/ tile background), dot grid background  
 ✅ **Process (Scrollytelling)** — Sticky split layout: left rail w/ live step highlight + progress, scrolling IntersectionObserver-driven detail panels (no GSAP), internally scrollable on desktop / stacked cards on mobile, sticky dot grid  
@@ -104,8 +104,9 @@ GROQ queries flatten Sanity types to match existing TypeScript interfaces (no tr
 
 ### IntroSplashSection.tsx ⭐ (section 0)
 - NetworkCanvas: 100 particles, 180px radius, 0.3 line alpha (lazy-loaded via `NetworkCanvasLazy`)
-- **Headline is server-rendered plain text** (`LINE_ONE` white + `LINE_TWO` accent blue) — it's the page's LCP element, so it must paint without waiting for JS. The entrance is a **pure-CSS** blur-up (`.animate-splash-line` keyframes in `globals.css`, reduced-motion aware), not a JS typewriter. ⚠️ The old char-by-char typewriter (`charCount` state) was the cause of a 14.8s mobile LCP — do not reintroduce JS-gated text here.
-- A static blinking cursor sits at the end of `LINE_TWO`; a `showHint` timer (1.6s) reveals the scroll hint with bouncing `↓` arrow
+- **Headline is server-rendered full text** (`charCount` defaults to `FULL_LEN`, so `LINE_ONE` + `LINE_TWO` are in the SSR HTML) — it's the page's LCP element, so it must paint without waiting for JS.
+- **Hybrid reveal** (keeps the typewriter without the LCP hit): the JS typewriter runs on **desktop only**. Until it starts, the `<h1>` carries `.splash-pretype`, which is `visibility: hidden` **only at `≥768px`** (`globals.css`) — so desktop can type from empty with no flash of the full text, while **mobile keeps the text visible immediately** (the media query doesn't apply) and skips the typewriter. Reduced-motion + mobile both fall through to the static full headline. ⚠️ Do not make the headline text itself depend on JS (the old `charCount: 0` default left the LCP element empty → 14.8s mobile LCP).
+- Cursor blinks only during the desktop typewriter (`showCursor = typing && !isComplete`); `isComplete` drives the scroll hint with bouncing `↓` arrow
 - Navbar hidden while on this section (`visible={currentIndex > 0}` from page.tsx)
 
 ### PortfolioSection.tsx ⭐ (section 4)
@@ -358,7 +359,8 @@ public/icons/shopify.svg                             # Custom Shopify icon
 | Only one Process step / one Portfolio card visible on mobile | Fix: `md:h-[100dvh] md:overflow-y-auto` — drops internal scroller on mobile |
 | Process panels: reveal wrong / cards hidden on mobile | `isDesktop` state (default `false`) selects the trigger — desktop replays the reveal off `active`, mobile uses `whileInView once` so stacked cards reveal and stay (avoids hiding non-active cards + SSR hydration mismatch) |
 | Big number/text blurs mid-animation | Animating `scale` on large text rasterizes the glyph and stretches the bitmap → blur during the transform. Animate `translateY`/opacity instead; keep `scale` off huge text |
-| Slow mobile LCP (was 14.8s) | The LCP element (intro headline) was empty until a JS typewriter typed it. Fix: server-render the text and animate the entrance in **pure CSS** (`.animate-splash-line`). Never gate above-the-fold/LCP text behind JS or a Framer `initial:{opacity:0}` |
+| Slow mobile LCP (was 14.8s) | The LCP element (intro headline) was empty until a JS typewriter typed it. Fix: server-render the full text (default `charCount = FULL_LEN`); run the typewriter **desktop-only**, hiding the `<h1>` until it starts via `.splash-pretype` (`visibility:hidden` at `≥768px` only). Mobile shows the text instantly. Never gate above-the-fold/LCP text behind JS or a Framer `initial:{opacity:0}` |
+| Typewriter intro missing on desktop | Caused by the LCP fix removing the JS typewriter entirely. Fix: restore it as a **desktop-only** enhancement (the hybrid above) — don't bring it back on mobile (that's the LCP regression) |
 | High mobile TBT / long tasks from canvas | `NetworkCanvas` ran rAF for all 3 sections at once. Fix: lazy-load (`NetworkCanvasLazy`), cut particles on mobile, skip under `prefers-reduced-motion`, and pause via `IntersectionObserver` + `visibilitychange` when offscreen/hidden |
 | Nested snap traps Process (can't escape to next section) | Make steps full-viewport `snap-start` so `scrollTop: 0` = first step and the last step's snap = max scroll → `useSnapScroll` still detects atTop/atBottom. If `snap-mandatory` feels too sticky, use `snap-proximity` |
 | Standalone route (`/contact`, `/work`) won't scroll on desktop | `globals.css` sets `html, body { overflow: hidden }` ≥768px for the homepage snap-scroll. Standalone routes have no snap container, so make `<main>` its own scroll area: `md:h-[100dvh] md:overflow-y-auto` (+ `overflow-x-hidden` to clip the aurora). `h-[100dvh]` is viewport-relative so it ignores `body` height |

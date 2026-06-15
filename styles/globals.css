@@ -79,27 +79,13 @@ a:focus-visible {
   50%, 100% { opacity: 0; }
 }
 
-/* Intro headline entrance — pure CSS so it runs without waiting for the JS
-   bundle to download/hydrate. The text is server-rendered (LCP-eligible at
-   first paint); this only fades/blurs it in. */
-@keyframes splashReveal {
-  from { opacity: 0; filter: blur(12px); transform: translateY(24px); }
-  to   { opacity: 1; filter: blur(0);    transform: translateY(0); }
-}
-
-.animate-splash-line {
-  opacity: 0;
-  animation: splashReveal 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-
-.animate-splash-line-2 {
-  animation-delay: 0.15s;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .animate-splash-line {
-    animation: none;
-    opacity: 1;
+/* Intro headline: the full text is server-rendered (LCP + SEO safe). On DESKTOP
+   the JS typewriter drives the reveal, so we hide it until typing starts to
+   avoid a flash of the complete headline. The hide is desktop-only, so mobile
+   keeps the text visible immediately — no JS on the LCP path there. */
+@media (min-width: 768px) {
+  .splash-pretype {
+    visibility: hidden;
   }
 }
 
