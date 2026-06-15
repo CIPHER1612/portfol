@@ -1,29 +1,29 @@
-import type { Metadata } from ‘next’;
-import ContactClient from ‘@/components/ContactClient’;
+import type { Metadata } from 'next';
+import ContactClient from '@/components/ContactClient';
 
 export const metadata: Metadata = {
-  title: ‘Start a Project’,
+  title: 'Start a Project',
   description:
-    ‘Start a project with PinnacleByte. Tell us about your Next.js app, MERN stack project, Shopify store, or Sanity CMS site — we reply within 1–2 business days.’,
+    'Start a project with PinnacleByte. Tell us about your Next.js app, MERN stack project, Shopify store, or Sanity CMS site — we reply within 1–2 business days.',
   openGraph: {
-    url: ‘/contact’,
-    title: ‘Start a Project | PinnacleByte’,
+    url: '/contact',
+    title: 'Start a Project | PinnacleByte',
     description:
-      ‘Tell us about your Next.js app, MERN stack project, or Shopify store. We reply within 1–2 business days.’,
+      'Tell us about your Next.js app, MERN stack project, or Shopify store. We reply within 1–2 business days.',
   },
   twitter: {
-    title: ‘Start a Project | PinnacleByte’,
+    title: 'Start a Project | PinnacleByte',
     description:
-      ‘Tell us about your Next.js app, MERN stack project, or Shopify store. We reply within 1–2 business days.’,
+      'Tell us about your Next.js app, MERN stack project, or Shopify store. We reply within 1–2 business days.',
   },
 };
 
 const breadcrumbJsonLd = {
-  ‘@context’: ‘https://schema.org’,
-  ‘@type’: ‘BreadcrumbList’,
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
   itemListElement: [
-    { ‘@type’: ‘ListItem’, position: 1, name: ‘Home’, item: ‘https://pinnaclebyte.dev’ },
-    { ‘@type’: ‘ListItem’, position: 2, name: ‘Contact’, item: ‘https://pinnaclebyte.dev/contact’ },
+    { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://pinnaclebyte.dev' },
+    { '@type': 'ListItem', position: 2, name: 'Contact', item: 'https://pinnaclebyte.dev/contact' },
   ],
 };
 
