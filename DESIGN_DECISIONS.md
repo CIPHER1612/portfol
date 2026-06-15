@@ -94,7 +94,7 @@ The original section 7 was a testimonials marquee fed by `portfolioTestimonial` 
 
 **Server-page / client-component split for `/contact`**
 
-`app/contact/page.tsx` stays a server component (so it can `export const metadata` for SEO) and renders `ContactClient` (`'use client'`) for the interactive form — the same pattern as `app/page.tsx` → `HomePageClient`. The form has no backend yet, so submission composes a prefilled `mailto:` and shows an inline confirmation; the `handleSubmit` is isolated so it can later be swapped for a server action + email without touching the markup.
+`app/contact/page.tsx` stays a server component (so it can `export const metadata` for SEO) and renders `ContactClient` (`'use client'`) for the interactive form — the same pattern as `app/page.tsx` → `HomePageClient`. Submission calls the `submitContact` **server action** (`app/contact/actions.ts`), which keeps the `RESEND_API_KEY` server-only and runs the honeypot → rate-limit → validate → Resend-send pipeline; `handleSubmit` just maps the result to loading / inline-error / confirmation UI. Keeping the action separate from the markup means the send mechanism can change (CRM, autoresponder) without touching the form.
 
 **Tech icon tile background**
 

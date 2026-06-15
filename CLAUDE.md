@@ -19,7 +19,7 @@
 ✅ **Mobile Responsive Layout** — All sections use `min-h-[100dvh] md:h-full`; sections 3 & 4 drop internal-scroll on mobile and flow naturally  
 ✅ **Sanity CMS** — All content in Sanity Cloud (project `b3q3iq0h`, dataset `production`); Studio embedded at `/studio`  
 ✅ **Data Layer** — `lib/sanityFetch.ts` GROQ helpers; `app/page.tsx` async server component; sections receive data as props  
-✅ **Contact Page** (`/contact`) — Premium dark rebuild: `AuroraBackground`, animated form (name / email / company / project-type / message), `mailto:` submission + inline confirmation, info sidebar, shared `PageHeader`  
+✅ **Contact Page** (`/contact`) — Premium dark rebuild: `AuroraBackground`, animated form (name / email / company / project-type / message), **Resend-backed server action** submission (honeypot + per-IP rate limit + server-side validation) with loading + inline error/confirmation states, info sidebar, shared `PageHeader`  
 ✅ **Work Pages** (`/work`, `/work/[slug]`) — Dark-theme rebuild wired to Sanity: gallery renders real cover images + a category filter; case study renders the real `description` / `tech` / `image` / `liveUrl` with dynamic SEO `generateMetadata`  
 ✅ **SEO Layer** — `metadataBase` + title template (`%s | PinnacleByte`) in `layout.tsx`; per-page Open Graph + Twitter Cards on all routes; JSON-LD (`Organization` + `WebSite` on homepage, `BreadcrumbList` on `/contact`, `/work`, `/work/[slug]`); dynamic `app/sitemap.ts` (auto-pulls Sanity slugs); `app/robots.ts` (allows all, blocks `/studio`); keywords realigned to MERN / Next.js / Sanity / Supabase; `public/logo.jpeg` as default OG image; case study pages use Sanity cover image as per-page OG image  
 ✅ **Google Analytics 4** — `G-34753GHP1F` via `next/script strategy="afterInteractive"` in `layout.tsx` (no LCP impact); domain `pinnaclebyte.dev` verified in GA4 + Google Search Console; sitemap submitted  
@@ -224,8 +224,8 @@ These live **outside** the snap-scroll shell, so they don't use the homepage `Na
 
 ### ContactClient.tsx (`/contact`)
 - `app/contact/page.tsx` is a **server component** exporting `metadata`, rendering `<ContactClient />` (mirrors the `app/page.tsx` → `HomePageClient` split so the route keeps SEO metadata while the form uses hooks).
-- Dark theme + `AuroraBackground`. Controlled form: name, email, company (optional), project-type `select`, message — with labels, `required`, email validation.
-- **No backend yet** — `handleSubmit` composes a prefilled `mailto:hello@pinnaclebyte.dev` and swaps in an inline confirmation panel (with a direct-email fallback + "Send another"). The handler is the single spot to swap for a server action later.
+- Dark theme + `AuroraBackground`. Controlled form: name, email, company (optional), project-type `select`, message — with labels, `required`, email validation. Plus a visually-hidden **honeypot** input (`companyUrl`, off the tab order) that bots fill and humans never see.
+- **Backend: `submitContact` server action** (`app/contact/actions.ts`) — `handleSubmit` calls it and renders loading (spinner), inline error, or the confirmation panel based on the result. The action pipeline is: honeypot check (silently drops bot submissions) → per-IP rate limit (3/min, in-memory) → server-side validation + length caps → send via **Resend** (plain-text email, `replyTo` = visitor email). Requires `RESEND_API_KEY` (and optional `CONTACT_FROM_EMAIL`) env vars — see `.env.example`. Missing key fails gracefully with a "email us directly" message + server log.
 - Sidebar: Email / Response-time / Studio info cards + a "What happens next" checklist.
 
 ### WorkGallery.tsx + case study (`/work`, `/work/[slug]`)
@@ -281,7 +281,8 @@ app/contact/page.tsx                                 # /contact — server page 
 app/work/page.tsx                                    # /work — server page (metadata + BreadcrumbList JSON-LD) → WorkGallery (Sanity projects)
 app/work/[slug]/page.tsx                             # /work/[slug] — case study from Sanity + generateMetadata (OG image) + BreadcrumbList JSON-LD
 components/HomePageClient.tsx                        # 'use client' — snap scroll hooks, sections array, passes data props
-components/ContactClient.tsx                         # /contact — 'use client' premium form (mailto + inline confirmation), AuroraBackground
+app/contact/actions.ts                               # /contact — 'use server' submitContact action (honeypot + per-IP rate limit + validation + Resend send)
+components/ContactClient.tsx                         # /contact — 'use client' premium form (calls submitContact, loading/error/confirmation states), AuroraBackground
 components/work/WorkGallery.tsx                       # /work — category filter + cards rendering Sanity cover images
 components/ui/PageHeader.tsx                          # Shared sticky header for standalone routes (/contact, /work) — logo + back link
 types/index.ts                                       # Project, Testimonial, TeamMember, Service
@@ -396,7 +397,7 @@ No `.env.local` required for public reads — Sanity dataset is public.
 
 ## Future Enhancements
 
-- Contact form: swap the `mailto:` submission in `ContactClient.tsx` for a server action + email (Resend / Nodemailer) — the handler is isolated for exactly this
+- Contact form: now wired to Resend via the `submitContact` server action. Possible follow-ups — upgrade the in-memory rate limiter to Vercel KV / Upstash for a real distributed limit (only if abuse appears), forward inquiries to a CRM, or add an autoresponder email to the visitor
 - `/work/[slug]` case studies could grow richer Sanity fields (gallery images, results/metrics, body blocks) beyond the current `description` / `tech` / `image` / `liveUrl`
 - Delete the orphaned `portfolioTestimonial` docs in Studio and (optionally) remove the now-unused `fetchTestimonials` helper + `Testimonial` type + schema
 - ProcessTimeline: optional auto-advance / "play" mode, or per-step icons/illustrations in the detail panels
@@ -408,9 +409,9 @@ No `.env.local` required for public reads — Sanity dataset is public.
 
 ---
 
-**Last Updated**: June 2026 — **SEO + Analytics.** Full SEO layer added: `metadataBase` + title template in `layout.tsx`; per-page Open Graph + Twitter Cards; JSON-LD (`Organization` + `WebSite` on homepage, `BreadcrumbList` on all inner routes); dynamic `app/sitemap.ts` pulling Sanity slugs; `app/robots.ts`; keywords realigned to MERN / Next.js / Sanity / Supabase; `public/logo.jpeg` as default OG image; case study `generateMetadata` now includes per-project OG image. Google Analytics 4 (`G-34753GHP1F`) wired via `next/script afterInteractive`. Domain `pinnaclebyte.dev` verified in GA4 and Google Search Console; sitemap submitted.  
-**Previously**: **Security audit hardening.** Added `Strict-Transport-Security` (HSTS) + `Content-Security-Policy-Report-Only` + `X-Robots-Tag: noindex` on `/studio`; added `lib/url.ts` `isHttpUrl()` CMS URL guard; removed stray `ADMIN_PASSWORD` from `.env.local`.  
-**Earlier**: **Testimonials → Trust swap + standalone-route dark rebuild.** `TrustSection` replaced the fabricated Testimonials marquee. `/contact`, `/work`, `/work/[slug]` rebuilt in dark theme wired to Sanity. Pricing section added at index 5. Process: sticky split scrollytelling + nested CSS snap-scroll + GSAP removed. Portfolio: hover lift/glow/zoom + "Visit this site" button.  
+**Last Updated**: June 2026 — **Contact form backend.** Replaced the `/contact` `mailto:` submission with a `submitContact` **server action** (`app/contact/actions.ts`): honeypot field → per-IP in-memory rate limit (3/min) → server-side validation + length caps → send via **Resend** (plain-text, `replyTo` = visitor). `ContactClient.tsx` now renders loading/error/confirmation states. Requires `RESEND_API_KEY` (+ optional `CONTACT_FROM_EMAIL`) — documented in `.env.example`.  
+**Previously**: **SEO + Analytics.** Full SEO layer added: `metadataBase` + title template in `layout.tsx`; per-page Open Graph + Twitter Cards; JSON-LD (`Organization` + `WebSite` on homepage, `BreadcrumbList` on all inner routes); dynamic `app/sitemap.ts` pulling Sanity slugs; `app/robots.ts`; keywords realigned to MERN / Next.js / Sanity / Supabase; `public/logo.jpeg` as default OG image; case study `generateMetadata` now includes per-project OG image. Google Analytics 4 (`G-34753GHP1F`) wired via `next/script afterInteractive`. Domain `pinnaclebyte.dev` verified in GA4 and Google Search Console; sitemap submitted.  
+**Earlier**: **Security audit hardening.** Added `Strict-Transport-Security` (HSTS) + `Content-Security-Policy-Report-Only` + `X-Robots-Tag: noindex` on `/studio`; added `lib/url.ts` `isHttpUrl()` CMS URL guard; removed stray `ADMIN_PASSWORD` from `.env.local`. **Before that**: Testimonials → Trust swap + standalone-route dark rebuild; `/contact`, `/work`, `/work/[slug]` rebuilt in dark theme wired to Sanity; Pricing section added at index 5; Process scrollytelling + GSAP removed.  
 **Dark Theme (Navy + Electric Blue)**: ✅  
 **Animated Backgrounds**: ✅ (dot grid, aurora blobs, network canvas)  
 **Full-Page Snap Scroll**: ✅ (sections 3 & 4 internally scrollable via `internalScrollSections[]`)  
@@ -418,4 +419,5 @@ No `.env.local` required for public reads — Sanity dataset is public.
 **ISR**: ✅ (`useCdn: false` + `next: { revalidate: 60 }` on all fetch calls)  
 **Security Headers**: ✅ (HSTS + CSP-Report-Only + base 5 headers; `/studio` noindex)  
 **SEO**: ✅ (sitemap, robots, OG/Twitter, JSON-LD, GA4)  
-**Next Task**: Swap the contact form `mailto:` for a server action + email (Resend / Nodemailer)
+**Contact Form**: ✅ (Resend server action — honeypot + rate limit + validation; needs `RESEND_API_KEY` + verified domain)  
+**Next Task**: Promote `Content-Security-Policy-Report-Only` to an enforced `Content-Security-Policy` once no violations are seen on public routes; replace `public/logo.jpeg` OG image with a proper 1200×630 banner

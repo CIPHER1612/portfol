@@ -21,7 +21,7 @@ npm run build
 npm run start
 ```
 
-No `.env.local` required — public Sanity reads need no token.
+Public Sanity reads need no token. The only env vars are for the contact form — copy `.env.example` to `.env.local` and set `RESEND_API_KEY` (get one at [resend.com](https://resend.com)) to enable email sending. Without it the site runs fine; the contact form just shows an "email us directly" fallback.
 
 ## Content Management (Sanity Studio)
 
@@ -75,10 +75,12 @@ app/
   work/
     page.tsx                        # All projects gallery — renders Sanity cover images + category filter
     [slug]/page.tsx                 # Case study — real Sanity description/tech/image/liveUrl + generateMetadata + OG image
-  contact/page.tsx                  # /contact — server page (metadata) → ContactClient
+  contact/
+    page.tsx                        # /contact — server page (metadata) → ContactClient
+    actions.ts                      # 'use server' submitContact — honeypot + per-IP rate limit + validation + Resend send
 components/
   HomePageClient.tsx                # 'use client' — snap scroll hooks, passes data to sections
-  ContactClient.tsx                 # /contact — 'use client' premium form (mailto + confirmation), aurora background
+  ContactClient.tsx                 # /contact — 'use client' premium form (calls submitContact server action; loading/error/confirmation states), aurora background
   work/
     WorkGallery.tsx                 # /work — 'use client' category filter, cards render Sanity images
   sections/
@@ -172,19 +174,21 @@ After deploying: submit `https://pinnaclebyte.dev/sitemap.xml` in Google Search 
 
 ## Deployment (Vercel)
 
-Deploy the repo to Vercel with no extra environment variables — public Sanity reads need no token. After deploying:
+Deploy the repo to Vercel. The only environment variable is `RESEND_API_KEY` (plus optional `CONTACT_FROM_EMAIL`) for the contact form — add it under **Settings → Environment Variables** (scope: Production) and redeploy, since env vars only take effect on a new deployment. Public Sanity reads need no token. After deploying:
 
 - `/studio` gives you a live content editing UI (log in with your Sanity account)
 - Content changes in Sanity Studio appear on the live site within ~60 seconds (ISR, no redeploy needed)
 - `/work/[slug]` pages are statically generated at build time from Sanity data — new projects also revalidate every 60 seconds via ISR
 - `/sitemap.xml` and `/robots.txt` are served automatically by Next.js from `app/sitemap.ts` and `app/robots.ts`
+- **Contact form**: verify your sending domain in Resend (Domains tab) so it can send as `contact@pinnaclebyte.dev`; until then use `onboarding@resend.dev` as `CONTACT_FROM_EMAIL` for testing
 
 ## Security
 
 - **HTTP headers** (`next.config.mjs`): `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `X-DNS-Prefetch-Control`, plus `Strict-Transport-Security` (HSTS) and a `Content-Security-Policy-Report-Only` policy. CSP runs in **Report-Only** mode for now (Sanity Studio + Framer Motion need `'unsafe-inline'`/`'unsafe-eval'`) — watch the browser console for violations on the public routes, then promote it to an enforced `Content-Security-Policy`.
 - **`/studio`** is served with `X-Robots-Tag: noindex, nofollow`; write access is gated by Sanity authentication (project members only).
 - **CMS link safety**: `lib/url.ts` `isHttpUrl()` guards any CMS-supplied `liveUrl` to be `http(s)` before it's used as an `href`, so a `javascript:` value can't execute.
-- **Secrets**: public Sanity reads need no token, so nothing sensitive ships in the client bundle. Don't commit `.env*` (gitignored). When you add a contact-form backend, keep the email-provider key server-only and add input validation + rate limiting.
+- **Secrets**: public Sanity reads need no token, so nothing sensitive ships in the client bundle. Don't commit `.env*` (gitignored). The contact form's `RESEND_API_KEY` is read only inside the `submitContact` server action, so it never reaches the client bundle.
+- **Contact form abuse**: the `submitContact` server action defends the endpoint with a honeypot field (silently drops bots), a per-IP in-memory rate limit (3/min), and server-side validation + length caps on every field. Email is sent as plain text (no HTML = no injection surface). The in-memory limiter is per-instance and resets on serverless cold starts — upgrade to Vercel KV / Upstash only if real abuse appears.
 
 > A more detailed internal audit lives in `SECURITY_AUDIT.md` (gitignored — not published to this public repo).
 

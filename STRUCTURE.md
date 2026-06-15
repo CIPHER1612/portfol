@@ -28,7 +28,7 @@ app/
 
 ### `/components/ContactClient.tsx` & `/components/work/WorkGallery.tsx`
 
-Client components for the standalone routes. `ContactClient` is the premium `/contact` form (controlled inputs, `mailto:` submission + inline confirmation, `AuroraBackground`). `WorkGallery` is the `/work` gallery with category-filter state whose cards render the real Sanity `project.image`. Both sit outside the snap-scroll shell, so they don't use `Navbar`; they use the shared `PageHeader` and make `<main>` its own desktop scroll container (`md:h-[100dvh] md:overflow-y-auto`).
+Client components for the standalone routes. `ContactClient` is the premium `/contact` form (controlled inputs, honeypot field, `AuroraBackground`) that submits via the `submitContact` server action in `app/contact/actions.ts` (Resend send behind honeypot + rate-limit + validation) and renders loading / inline-error / confirmation states. `WorkGallery` is the `/work` gallery with category-filter state whose cards render the real Sanity `project.image`. Both sit outside the snap-scroll shell, so they don't use `Navbar`; they use the shared `PageHeader` and make `<main>` its own desktop scroll container (`md:h-[100dvh] md:overflow-y-auto`).
 
 ### `/components/ui` — Shared Primitives
 
