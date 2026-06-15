@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, Clock, Globe, Check, ChevronDown } from 'lucide-react';
+import { Mail, Clock, Globe, Check, ChevronDown, Loader2 } from 'lucide-react';
 import AuroraBackground from '@/components/ui/AuroraBackground';
 import PageHeader from '@/components/ui/PageHeader';
+import { submitContact } from '@/app/contact/actions';
 
 const STUDIO_EMAIL = 'hello@pinnaclebyte.dev';
 
@@ -21,6 +22,8 @@ interface FormState {
   company: string;
   projectType: string;
   message: string;
+  // Honeypot — hidden from users, only bots fill it.
+  companyUrl: string;
 }
 
 const EMPTY_FORM: FormState = {
@@ -29,35 +32,37 @@ const EMPTY_FORM: FormState = {
   company: '',
   projectType: projectTypes[0],
   message: '',
+  companyUrl: '',
 };
 
 export default function ContactClient() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  // No backend yet — compose a prefilled email so the inquiry reaches the studio.
-  function handleSubmit(e: React.FormEvent) {
+  // Submit through the server action — validates, rate-limits, and emails via Resend.
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const subject = `New project inquiry — ${form.name || 'Website'}`;
-    const body = [
-      `Name: ${form.name}`,
-      `Email: ${form.email}`,
-      form.company && `Company / Website: ${form.company}`,
-      `Project type: ${form.projectType}`,
-      '',
-      form.message,
-    ]
-      .filter(Boolean)
-      .join('\n');
+    setSubmitting(true);
+    setError(null);
 
-    window.location.href = `mailto:${STUDIO_EMAIL}?subject=${encodeURIComponent(
-      subject
-    )}&body=${encodeURIComponent(body)}`;
-    setSubmitted(true);
+    try {
+      const result = await submitContact(form);
+      if (result.ok) {
+        setSubmitted(true);
+      } else {
+        setError(result.error);
+      }
+    } catch {
+      setError('Something went wrong. Please email us directly.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -97,6 +102,7 @@ export default function ContactClient() {
                 onReset={() => {
                   setForm(EMPTY_FORM);
                   setSubmitted(false);
+                  setError(null);
                 }}
               />
             ) : (
@@ -182,11 +188,41 @@ export default function ContactClient() {
                   />
                 </div>
 
+                {/* Honeypot — visually hidden, off the tab order, never autofilled. */}
+                <div aria-hidden="true" className="absolute left-[-9999px] top-0 h-0 w-0 overflow-hidden">
+                  <label htmlFor="companyUrl">Company URL (leave blank)</label>
+                  <input
+                    id="companyUrl"
+                    type="text"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    value={form.companyUrl}
+                    onChange={(e) => update('companyUrl', e.target.value)}
+                  />
+                </div>
+
+                {error && (
+                  <p
+                    role="alert"
+                    className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+                  >
+                    {error}
+                  </p>
+                )}
+
                 <button
                   type="submit"
-                  className="inline-flex w-full items-center justify-center rounded-full bg-accent-500 px-6 py-3 text-sm font-semibold text-bg-dark shadow-teal-glow transition hover:bg-accent-600 hover:shadow-teal-glow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-dark sm:w-auto"
+                  disabled={submitting}
+                  className="inline-flex w-full items-center justify-center rounded-full bg-accent-500 px-6 py-3 text-sm font-semibold text-bg-dark shadow-teal-glow transition hover:bg-accent-600 hover:shadow-teal-glow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-dark disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
-                  Send inquiry
+                  {submitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending&hellip;
+                    </>
+                  ) : (
+                    'Send inquiry'
+                  )}
                 </button>
               </form>
             )}
@@ -270,10 +306,10 @@ function ConfirmationPanel({ onReset }: { onReset: () => void }) {
       <span className="flex h-14 w-14 items-center justify-center rounded-full bg-accent-500/15 text-accent-400 shadow-teal-glow">
         <Check className="h-7 w-7" />
       </span>
-      <h2 className="mt-6 text-2xl font-semibold text-primary-50">Your message is on its way.</h2>
+      <h2 className="mt-6 text-2xl font-semibold text-primary-50">Message sent — thank you.</h2>
       <p className="mt-3 max-w-md text-primary-300">
-        Your email client should have opened with the details prefilled. If it didn&rsquo;t, reach us
-        directly at{' '}
+        We&rsquo;ve received your inquiry and will reply within 1&ndash;2 business days. You can also
+        reach us directly at{' '}
         <a
           href={`mailto:${STUDIO_EMAIL}`}
           className="font-semibold text-accent-400 transition hover:text-accent-300"
