@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 import Button from '@/components/ui/Button';
-import NetworkCanvas from '@/components/ui/NetworkCanvas';
+import NetworkCanvas from '@/components/ui/NetworkCanvasLazy';
 import { useTypewriter } from '@/hooks/useTypewriter';
 import heroImage from '@/components/image/hero.png';
 

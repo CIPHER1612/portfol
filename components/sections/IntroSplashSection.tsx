@@ -1,43 +1,22 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import NetworkCanvas from '@/components/ui/NetworkCanvas';
+import NetworkCanvas from '@/components/ui/NetworkCanvasLazy';
 
 const LINE_ONE = "THE WORLD'S BEST";
 const LINE_TWO = 'DEVELOPERS';
-const FULL_PHRASE = LINE_ONE + LINE_TWO;
-const TYPING_SPEED_MS = 80;
-const START_DELAY_MS = 500;
 
 export default function IntroSplashSection() {
-  const [charCount, setCharCount] = useState(0);
-  const [isComplete, setIsComplete] = useState(false);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // The scroll hint is non-critical chrome, so it can wait for JS — but the
+  // headline below is plain server-rendered text so it paints immediately
+  // (it's the LCP element; gating it behind JS was the old 14.8s LCP cause).
+  const [showHint, setShowHint] = useState(false);
 
   useEffect(() => {
-    const startTimer = setTimeout(() => {
-      intervalRef.current = setInterval(() => {
-        setCharCount((prev) => {
-          const next = prev + 1;
-          if (next >= FULL_PHRASE.length) {
-            clearInterval(intervalRef.current!);
-            setTimeout(() => setIsComplete(true), 400);
-          }
-          return next;
-        });
-      }, TYPING_SPEED_MS);
-    }, START_DELAY_MS);
-
-    return () => {
-      clearTimeout(startTimer);
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
+    const t = setTimeout(() => setShowHint(true), 1600);
+    return () => clearTimeout(t);
   }, []);
-
-  const line1 = LINE_ONE.slice(0, Math.min(charCount, LINE_ONE.length));
-  const line2 = charCount > LINE_ONE.length ? LINE_TWO.slice(0, charCount - LINE_ONE.length) : '';
-  const showCursor = !isComplete;
 
   return (
     <section
@@ -55,22 +34,19 @@ export default function IntroSplashSection() {
 
       <div className="relative z-10 flex flex-col items-center justify-center text-center px-6 select-none">
         <h1 className="font-black tracking-tight leading-[1.05]">
-          <span className="block text-4xl sm:text-6xl lg:text-8xl text-primary-50">
-            {line1}
-            {line2 === '' && showCursor && (
-              <span className="inline-block w-[3px] h-[0.8em] bg-accent-400 ml-1 align-middle animate-[cursorBlink_1s_ease-in-out_infinite]" />
-            )}
+          {/* Reveal is pure CSS (animate-splash-line) so the text is present and
+              painted on first server render — no JS bundle on the LCP path. */}
+          <span className="animate-splash-line block text-4xl sm:text-6xl lg:text-8xl text-primary-50">
+            {LINE_ONE}
           </span>
-          <span className="block text-4xl sm:text-6xl lg:text-8xl text-accent-400 mt-1">
-            {line2}
-            {line2 !== '' && showCursor && (
-              <span className="inline-block w-[3px] h-[0.8em] bg-accent-400 ml-1 align-middle animate-[cursorBlink_1s_ease-in-out_infinite]" />
-            )}
+          <span className="animate-splash-line animate-splash-line-2 block text-4xl sm:text-6xl lg:text-8xl text-accent-400 mt-1">
+            {LINE_TWO}
+            <span className="ml-1 inline-block h-[0.8em] w-[3px] align-middle bg-accent-400 animate-[cursorBlink_1s_ease-in-out_infinite]" />
           </span>
         </h1>
 
         <AnimatePresence>
-          {isComplete && (
+          {showHint && (
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}

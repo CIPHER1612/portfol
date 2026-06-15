@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import Button from '@/components/ui/Button';
-import NetworkCanvas from '@/components/ui/NetworkCanvas';
+import NetworkCanvas from '@/components/ui/NetworkCanvasLazy';
 
 export default function FinalCtaSection() {
   return (
