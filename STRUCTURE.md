@@ -10,12 +10,14 @@ PinnacleByte portfolio — Next.js 16 App Router, React 19, TypeScript, Tailwind
 
 ```
 app/
-  layout.tsx                    # Root layout — LenisProvider wrapper, global metadata
-  page.tsx                      # Server Component — fetches Sanity data in parallel, renders HomePageClient
-  contact/page.tsx              # /contact — server page (exports metadata) → ContactClient
+  layout.tsx                    # Root layout — LenisProvider wrapper, GA4 script, full metadata (metadataBase, OG, Twitter, robots)
+  page.tsx                      # Server Component — fetches Sanity data in parallel, renders HomePageClient + Organization/WebSite JSON-LD
+  sitemap.ts                    # Dynamic sitemap — pulls all Sanity project slugs; served at /sitemap.xml
+  robots.ts                     # Robots rules — allow all crawlers, block /studio; served at /robots.txt
+  contact/page.tsx              # /contact — server page (exports metadata + BreadcrumbList JSON-LD) → ContactClient
   work/
-    page.tsx                    # /work — async server component → WorkGallery (renders Sanity cover images)
-    [slug]/page.tsx             # /work/[slug] — case study, real Sanity description/tech/image/liveUrl + generateMetadata (SSG via generateStaticParams)
+    page.tsx                    # /work — async server component + BreadcrumbList JSON-LD → WorkGallery
+    [slug]/page.tsx             # /work/[slug] — case study, generateMetadata with OG image + BreadcrumbList JSON-LD (SSG via generateStaticParams)
   studio/
     [[...tool]]/page.tsx        # Embedded Sanity Studio (dynamic, Sanity auth)
 ```
@@ -60,6 +62,7 @@ Client components for the standalone routes. `ContactClient` is the premium `/co
 |------|---------|
 | `sanity.ts` | Sanity client (`createClient`) — `projectId: b3q3iq0h`, `dataset: production`, `useCdn: false` (direct API, no CDN cache) |
 | `sanityFetch.ts` | Typed GROQ fetch helpers: `fetchProjects`, `fetchTeam`, `fetchProjectBySlug`, `fetchAllSlugs` (`fetchTestimonials` still exists but is no longer called) |
+| `url.ts` | `isHttpUrl()` — validates a CMS-supplied `liveUrl` is `http(s)` before use as an `href` (blocks `javascript:` XSS) |
 | `lenis.ts` | Lenis smooth scroll factory (mobile only) |
 
 ### `/hooks`
@@ -73,6 +76,7 @@ Client components for the standalone routes. `ContactClient` is the premium `/co
 
 ```
 public/
+  logo.jpeg             # Default Open Graph image (used in og:image for all pages without a cover image)
   icons/
     shopify.svg         # Custom Shopify brand icon (Simple Icons format)
   images/               # Optional local project images (reference as /images/filename.png)
@@ -84,7 +88,7 @@ public/
 |------|---------|
 | `sanity.config.ts` | Sanity Studio schema — defines `portfolioProject`, `portfolioTestimonial`, `portfolioTeam` document types (`portfolioTestimonial` retained but no longer rendered) |
 | `tailwind.config.ts` | Color tokens, glow shadows |
-| `next.config.mjs` | `cdn.sanity.io` remotePattern, `reactStrictMode: true`, security headers (X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy) |
+| `next.config.mjs` | `cdn.sanity.io` remotePattern, `reactStrictMode: true`, security headers (HSTS, CSP-Report-Only, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy); `/studio` gets `X-Robots-Tag: noindex` |
 | `tsconfig.json` | `moduleResolution: bundler`, TypeScript 6 |
 
 ## Sanity Data Flow

@@ -21,6 +21,8 @@ npm run build
 npm run start
 ```
 
+No `.env.local` required — public Sanity reads need no token.
+
 ## Content Management (Sanity Studio)
 
 Project and team content is managed through Sanity Studio, embedded at `/studio`. (The homepage no longer shows testimonials — the fabricated marquee was replaced by a static "Fresh studio. Proven craft." Trust section — so the `portfolioTestimonial` type is retained but unused.)
@@ -65,11 +67,14 @@ Public reads bypass the Sanity CDN (`useCdn: false`) and revalidate every 60 sec
 
 ```
 app/
-  page.tsx                          # Server Component — fetches Sanity data, renders HomePageClient
+  layout.tsx                        # Root layout — GA4 script, global metadata (metadataBase, OG, Twitter)
+  page.tsx                          # Server Component — fetches Sanity data, renders HomePageClient + JSON-LD
+  sitemap.ts                        # Dynamic sitemap — includes all /work/[slug] slugs from Sanity
+  robots.ts                         # Robots rules — allow all, block /studio
   studio/[[...tool]]/page.tsx       # Embedded Sanity Studio (dynamic, auth via Sanity account)
   work/
     page.tsx                        # All projects gallery — renders Sanity cover images + category filter
-    [slug]/page.tsx                 # Case study — real Sanity description/tech/image/liveUrl + generateMetadata
+    [slug]/page.tsx                 # Case study — real Sanity description/tech/image/liveUrl + generateMetadata + OG image
   contact/page.tsx                  # /contact — server page (metadata) → ContactClient
 components/
   HomePageClient.tsx                # 'use client' — snap scroll hooks, passes data to sections
@@ -96,7 +101,8 @@ components/
   SnapScrollContainer.tsx           # Desktop full-page snap wrapper
 lib/
   sanity.ts                         # Sanity client config (useCdn: false, direct API reads)
-  sanityFetch.ts                    # Typed GROQ fetch helpers: fetchProjects, fetchTeam, fetchTestimonials, etc.
+  sanityFetch.ts                    # Typed GROQ fetch helpers: fetchProjects, fetchTeam, fetchProjectBySlug, fetchAllSlugs
+  url.ts                            # isHttpUrl() — guards CMS liveUrl before use as href (XSS prevention)
   lenis.ts                          # Lenis smooth scroll factory (mobile only)
 hooks/
   useSnapScroll.ts                  # Snap-scroll state + wheel/keyboard handlers
@@ -151,6 +157,19 @@ The breakpoint is `min-width: 768px`.
 | Process & Portfolio scroll | Internal scroller (`md:h-[100dvh] md:overflow-y-auto`) | Natural flow |
 | Process active-step observer | root = section element | root = `window` (`null`) |
 
+## SEO
+
+Full SEO layer is in place:
+
+- **Metadata**: `metadataBase` + title template in `layout.tsx`; per-page `title`/`description`/`openGraph`/`twitter` on every route
+- **Structured data (JSON-LD)**: `Organization` + `WebSite` schemas on the homepage; `BreadcrumbList` on `/contact`, `/work`, and each `/work/[slug]`
+- **Open Graph image**: `public/logo.jpeg` used as default; case study pages use their Sanity cover image as the OG image
+- **Sitemap**: `app/sitemap.ts` — dynamically pulls all `/work/[slug]` slugs from Sanity; served at `/sitemap.xml`
+- **Robots**: `app/robots.ts` — allows all crawlers, blocks `/studio`; served at `/robots.txt`
+- **Analytics**: Google Analytics 4 (`G-34753GHP1F`) loaded via `next/script` with `strategy="afterInteractive"` (no LCP impact)
+
+After deploying: submit `https://pinnaclebyte.dev/sitemap.xml` in Google Search Console and request indexing on the homepage URL.
+
 ## Deployment (Vercel)
 
 Deploy the repo to Vercel with no extra environment variables — public Sanity reads need no token. After deploying:
@@ -158,6 +177,7 @@ Deploy the repo to Vercel with no extra environment variables — public Sanity 
 - `/studio` gives you a live content editing UI (log in with your Sanity account)
 - Content changes in Sanity Studio appear on the live site within ~60 seconds (ISR, no redeploy needed)
 - `/work/[slug]` pages are statically generated at build time from Sanity data — new projects also revalidate every 60 seconds via ISR
+- `/sitemap.xml` and `/robots.txt` are served automatically by Next.js from `app/sitemap.ts` and `app/robots.ts`
 
 ## Security
 

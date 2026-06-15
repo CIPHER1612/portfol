@@ -21,6 +21,8 @@
 ✅ **Data Layer** — `lib/sanityFetch.ts` GROQ helpers; `app/page.tsx` async server component; sections receive data as props  
 ✅ **Contact Page** (`/contact`) — Premium dark rebuild: `AuroraBackground`, animated form (name / email / company / project-type / message), `mailto:` submission + inline confirmation, info sidebar, shared `PageHeader`  
 ✅ **Work Pages** (`/work`, `/work/[slug]`) — Dark-theme rebuild wired to Sanity: gallery renders real cover images + a category filter; case study renders the real `description` / `tech` / `image` / `liveUrl` with dynamic SEO `generateMetadata`  
+✅ **SEO Layer** — `metadataBase` + title template (`%s | PinnacleByte`) in `layout.tsx`; per-page Open Graph + Twitter Cards on all routes; JSON-LD (`Organization` + `WebSite` on homepage, `BreadcrumbList` on `/contact`, `/work`, `/work/[slug]`); dynamic `app/sitemap.ts` (auto-pulls Sanity slugs); `app/robots.ts` (allows all, blocks `/studio`); keywords realigned to MERN / Next.js / Sanity / Supabase; `public/logo.jpeg` as default OG image; case study pages use Sanity cover image as per-page OG image  
+✅ **Google Analytics 4** — `G-34753GHP1F` via `next/script strategy="afterInteractive"` in `layout.tsx` (no LCP impact); domain `pinnaclebyte.dev` verified in GA4 + Google Search Console; sitemap submitted  
 
 ## Sanity CMS Architecture
 
@@ -269,11 +271,15 @@ sanity.config.ts                                     # Sanity Studio schema (3 d
 lib/sanity.ts                                        # Sanity client config (useCdn: false, public reads — no write token in the client bundle)
 lib/sanityFetch.ts                                   # Typed GROQ helpers: fetchProjects, fetchTestimonials, fetchTeam, fetchProjectBySlug, fetchAllSlugs
 lib/url.ts                                           # isHttpUrl() guard — validates a CMS liveUrl is http(s) before it's used as an href (anti-XSS)
-app/page.tsx                                         # Async Server Component — fetches Sanity data, renders HomePageClient
+app/layout.tsx                                       # Root layout — metadataBase, title template, OG/Twitter defaults, GA4 script (G-34753GHP1F)
+app/sitemap.ts                                       # Dynamic sitemap — pulls all Sanity slugs; served at /sitemap.xml
+app/robots.ts                                        # Robots rules — allow all crawlers, block /studio; served at /robots.txt
+public/logo.jpeg                                     # Default Open Graph image for social sharing
+app/page.tsx                                         # Async Server Component — fetches Sanity data, renders HomePageClient + Organization/WebSite JSON-LD
 app/studio/[[...tool]]/page.tsx                      # Embedded Sanity Studio route
-app/contact/page.tsx                                 # /contact — server page (exports metadata) → ContactClient
-app/work/page.tsx                                    # /work — server page → WorkGallery (Sanity projects)
-app/work/[slug]/page.tsx                             # /work/[slug] — case study from Sanity (description/tech/image/liveUrl) + generateMetadata
+app/contact/page.tsx                                 # /contact — server page (metadata + BreadcrumbList JSON-LD) → ContactClient
+app/work/page.tsx                                    # /work — server page (metadata + BreadcrumbList JSON-LD) → WorkGallery (Sanity projects)
+app/work/[slug]/page.tsx                             # /work/[slug] — case study from Sanity + generateMetadata (OG image) + BreadcrumbList JSON-LD
 components/HomePageClient.tsx                        # 'use client' — snap scroll hooks, sections array, passes data props
 components/ContactClient.tsx                         # /contact — 'use client' premium form (mailto + inline confirmation), AuroraBackground
 components/work/WorkGallery.tsx                       # /work — category filter + cards rendering Sanity cover images
@@ -395,20 +401,21 @@ No `.env.local` required for public reads — Sanity dataset is public.
 - Delete the orphaned `portfolioTestimonial` docs in Studio and (optionally) remove the now-unused `fetchTestimonials` helper + `Testimonial` type + schema
 - ProcessTimeline: optional auto-advance / "play" mode, or per-step icons/illustrations in the detail panels
 - Sanity webhook → Vercel Deploy Hook for automatic redeploys on content publish (ISR already handles ~60s updates; webhook would make it instant)
+- SEO: promote `Content-Security-Policy-Report-Only` to enforced `Content-Security-Policy` after confirming no violations in the browser console on public routes
+- SEO: replace `public/logo.jpeg` OG image with a proper 1200×630 branded banner for better social sharing previews
+- SEO: add a blog/insights section targeting long-tail keywords (e.g. "how to build a headless CMS with Next.js and Sanity")
+- SEO: list on Clutch.co and submit to design award sites (Awwwards, CSS Design Awards) for high-authority backlinks
 
 ---
 
-**Last Updated**: June 2026 — **Security audit hardening.** Added `Strict-Transport-Security` (HSTS) + a `Content-Security-Policy-Report-Only` policy (scoped for Sanity Studio / Framer Motion) and `X-Robots-Tag: noindex` on `/studio` in `next.config.mjs`; added `lib/url.ts` `isHttpUrl()` to guard CMS `liveUrl` values before they reach an `href` (PortfolioSection + `/work/[slug]`); removed a stray `ADMIN_PASSWORD` from `.env.local`; ran `npm update` (in-range patches — residual advisories are transitive Sanity/Next **build-time** only, `--force` avoided). Full write-up lives in the local, gitignored `SECURITY_AUDIT.md`. Also gitignored `.claude/settings.local.json`, `blueprint/`, and the scratch `pinnaclebyte-pricing-prompt.md`.  
-**Previously**: **Testimonials → Trust swap + standalone-route dark rebuild.** Removed the fabricated Testimonials marquee (fake names/companies) and replaced it at index 7 with `TrustSection` ("Fresh studio. Proven craft." — 3 trust cards + "Start a conversation" `goTo` CTA, no Sanity data); dropped the `testimonials` fetch/prop from `app/page.tsx` + `HomePageClient` (the `portfolioTestimonial` schema + `fetchTestimonials` helper are retained but unused). Rebuilt `/contact` (premium dark form, `mailto` + confirmation, server-page/client split) and `/work` + `/work/[slug]` (dark theme, gallery now renders real Sanity cover images, case study now renders real `description`/`tech`/`image`/`liveUrl` + `generateMetadata`). Added shared `PageHeader`; standalone routes scroll via `<main md:h-[100dvh] md:overflow-y-auto>` (the global `body { overflow:hidden }` only suits the snap-scroll homepage).  
-**Earlier**: Pricing section added at index 5 (3 tier cards + Care Plan add-on, `goTo` CTA → contact; indices after Portfolio shifted +1). Process: sticky split scrollytelling + GSAP removed, word-by-word reveal, gradient/spring step numbers, nested CSS snap-scroll; Portfolio: hover lift/glow/zoom + "Visit this site" button.  
+**Last Updated**: June 2026 — **SEO + Analytics.** Full SEO layer added: `metadataBase` + title template in `layout.tsx`; per-page Open Graph + Twitter Cards; JSON-LD (`Organization` + `WebSite` on homepage, `BreadcrumbList` on all inner routes); dynamic `app/sitemap.ts` pulling Sanity slugs; `app/robots.ts`; keywords realigned to MERN / Next.js / Sanity / Supabase; `public/logo.jpeg` as default OG image; case study `generateMetadata` now includes per-project OG image. Google Analytics 4 (`G-34753GHP1F`) wired via `next/script afterInteractive`. Domain `pinnaclebyte.dev` verified in GA4 and Google Search Console; sitemap submitted.  
+**Previously**: **Security audit hardening.** Added `Strict-Transport-Security` (HSTS) + `Content-Security-Policy-Report-Only` + `X-Robots-Tag: noindex` on `/studio`; added `lib/url.ts` `isHttpUrl()` CMS URL guard; removed stray `ADMIN_PASSWORD` from `.env.local`.  
+**Earlier**: **Testimonials → Trust swap + standalone-route dark rebuild.** `TrustSection` replaced the fabricated Testimonials marquee. `/contact`, `/work`, `/work/[slug]` rebuilt in dark theme wired to Sanity. Pricing section added at index 5. Process: sticky split scrollytelling + nested CSS snap-scroll + GSAP removed. Portfolio: hover lift/glow/zoom + "Visit this site" button.  
 **Dark Theme (Navy + Electric Blue)**: ✅  
 **Animated Backgrounds**: ✅ (dot grid, aurora blobs, network canvas)  
 **Full-Page Snap Scroll**: ✅ (sections 3 & 4 internally scrollable via `internalScrollSections[]`)  
-**Portfolio Section**: ✅ (3-col card grid, Sanity data)  
 **Content Management**: ✅ (Sanity Studio at `/studio`, changes live within ~60s of publishing)  
 **ISR**: ✅ (`useCdn: false` + `next: { revalidate: 60 }` on all fetch calls)  
-**Security Headers**: ✅ (base 5: X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, X-DNS-Prefetch-Control — grade A on securityheaders.com — **plus** `Strict-Transport-Security` (HSTS) and `Content-Security-Policy-Report-Only`; `/studio` also gets `X-Robots-Tag: noindex, nofollow`. CSP is Report-Only for now because Sanity Studio + Framer Motion need `'unsafe-inline'`/`'unsafe-eval'`; promote to enforced after observing console reports)  
-**CMS URL Guard**: ✅ (`lib/url.ts` `isHttpUrl()` validates a CMS `liveUrl` is http(s) before it's used as an `href`, in `PortfolioSection` + `/work/[slug]` — blocks `javascript:` hrefs)  
-**Honest Trust Section**: ✅ (fabricated testimonials removed; transparent "Fresh studio. Proven craft." trust-builder in their place)  
-**Standalone Routes**: ✅ (`/contact`, `/work`, `/work/[slug]` on the dark theme + wired to Sanity)  
+**Security Headers**: ✅ (HSTS + CSP-Report-Only + base 5 headers; `/studio` noindex)  
+**SEO**: ✅ (sitemap, robots, OG/Twitter, JSON-LD, GA4)  
 **Next Task**: Swap the contact form `mailto:` for a server action + email (Resend / Nodemailer)
