@@ -6,7 +6,7 @@
 
 ## Current Status — June 2026 (updated)
 
-✅ **Intro Splash Section** — NetworkCanvas bg, one-shot typewriter, navbar hidden on section 0  
+✅ **Intro Splash Section** — NetworkCanvas bg, server-rendered headline with pure-CSS blur-up reveal (LCP-safe), navbar hidden on section 0  
 ✅ **Hero Section** — 120-particle NetworkCanvas, rotating typewriter eyebrow, two-column layout  
 ✅ **Services Section** — Tech icon grid (real brand icons w/ tile background), dot grid background  
 ✅ **Process (Scrollytelling)** — Sticky split layout: left rail w/ live step highlight + progress, scrolling IntersectionObserver-driven detail panels (no GSAP), internally scrollable on desktop / stacked cards on mobile, sticky dot grid  
@@ -103,9 +103,9 @@ GROQ queries flatten Sanity types to match existing TypeScript interfaces (no tr
 - Hero image: slides from right `x: 48→0` + blur dissolve, delay 0.4s
 
 ### IntroSplashSection.tsx ⭐ (section 0)
-- NetworkCanvas: 100 particles, 180px radius, 0.3 line alpha
-- One-shot typewriter via inline `useEffect` (NOT `useTypewriter`) — `LINE_ONE` white + `LINE_TWO` accent blue
-- `isComplete` state drives scroll hint with bouncing `↓` arrow
+- NetworkCanvas: 100 particles, 180px radius, 0.3 line alpha (lazy-loaded via `NetworkCanvasLazy`)
+- **Headline is server-rendered plain text** (`LINE_ONE` white + `LINE_TWO` accent blue) — it's the page's LCP element, so it must paint without waiting for JS. The entrance is a **pure-CSS** blur-up (`.animate-splash-line` keyframes in `globals.css`, reduced-motion aware), not a JS typewriter. ⚠️ The old char-by-char typewriter (`charCount` state) was the cause of a 14.8s mobile LCP — do not reintroduce JS-gated text here.
+- A static blinking cursor sits at the end of `LINE_TWO`; a `showHint` timer (1.6s) reveals the scroll hint with bouncing `↓` arrow
 - Navbar hidden while on this section (`visible={currentIndex > 0}` from page.tsx)
 
 ### PortfolioSection.tsx ⭐ (section 4)
@@ -202,6 +202,12 @@ The fabricated testimonials (fake names/companies like "Alex Chen, CTO at Innova
 ### NetworkCanvas.tsx ⭐ (reusable)
 Configurable props: `particleCount` (60), `connectionRadius` (155), `particleSize` (1.5), `particleAlpha` (0.3), `lineAlpha` (0.18), `speed` (0.45)
 
+**Performance guards** (added to fix mobile TBT / main-thread cost):
+- **Lazy-loaded** — consumers import `NetworkCanvasLazy` (`next/dynamic`, `ssr: false`), so the canvas chunk stays off the critical render path. It's decorative (`aria-hidden`), not LCP/SEO content.
+- **Reduced motion** — under `prefers-reduced-motion: reduce` it paints one static frame and never starts the rAF loop.
+- **Mobile** — uses ~40% of `particleCount` below 768px (the connection pass is O(n²), so this roughly quarters per-frame work).
+- **Offscreen pause** — an `IntersectionObserver` + `visibilitychange` listener only run the rAF loop while the canvas is on-screen and the tab is focused (previously all three canvases looped at once).
+
 | Section | particleCount | connectionRadius | lineAlpha |
 |---------|--------------|-----------------|-----------|
 | IntroSplash | 100 | 180 | 0.30 |
@@ -293,7 +299,8 @@ components/SnapScrollContainer.tsx                   # INTERNAL_SCROLL_INDICES =
 hooks/useSnapScroll.ts                               # internalScrollSections[] generalization
 hooks/useTypewriter.ts                               # Rotating typewriter (4-phase state machine)
 components/ui/Navbar.tsx                             # visible prop, goTo(), nav indices
-components/ui/NetworkCanvas.tsx                      # Configurable canvas particle system
+components/ui/NetworkCanvas.tsx                      # Configurable canvas particle system (reduced-motion + mobile + offscreen-pause guards)
+components/ui/NetworkCanvasLazy.tsx                  # next/dynamic ssr:false wrapper — keeps the decorative canvas off the critical render path
 components/ui/DotGridBackground.tsx                  # CSS dot grid pulse
 components/ui/AuroraBackground.tsx                   # Framer Motion aurora blobs
 components/LenisProvider.tsx                         # Mobile-only Lenis smooth scroll (no-op on desktop — snap-scroll owns the wheel)
@@ -351,6 +358,8 @@ public/icons/shopify.svg                             # Custom Shopify icon
 | Only one Process step / one Portfolio card visible on mobile | Fix: `md:h-[100dvh] md:overflow-y-auto` — drops internal scroller on mobile |
 | Process panels: reveal wrong / cards hidden on mobile | `isDesktop` state (default `false`) selects the trigger — desktop replays the reveal off `active`, mobile uses `whileInView once` so stacked cards reveal and stay (avoids hiding non-active cards + SSR hydration mismatch) |
 | Big number/text blurs mid-animation | Animating `scale` on large text rasterizes the glyph and stretches the bitmap → blur during the transform. Animate `translateY`/opacity instead; keep `scale` off huge text |
+| Slow mobile LCP (was 14.8s) | The LCP element (intro headline) was empty until a JS typewriter typed it. Fix: server-render the text and animate the entrance in **pure CSS** (`.animate-splash-line`). Never gate above-the-fold/LCP text behind JS or a Framer `initial:{opacity:0}` |
+| High mobile TBT / long tasks from canvas | `NetworkCanvas` ran rAF for all 3 sections at once. Fix: lazy-load (`NetworkCanvasLazy`), cut particles on mobile, skip under `prefers-reduced-motion`, and pause via `IntersectionObserver` + `visibilitychange` when offscreen/hidden |
 | Nested snap traps Process (can't escape to next section) | Make steps full-viewport `snap-start` so `scrollTop: 0` = first step and the last step's snap = max scroll → `useSnapScroll` still detects atTop/atBottom. If `snap-mandatory` feels too sticky, use `snap-proximity` |
 | Standalone route (`/contact`, `/work`) won't scroll on desktop | `globals.css` sets `html, body { overflow: hidden }` ≥768px for the homepage snap-scroll. Standalone routes have no snap container, so make `<main>` its own scroll area: `md:h-[100dvh] md:overflow-y-auto` (+ `overflow-x-hidden` to clip the aurora). `h-[100dvh]` is viewport-relative so it ignores `body` height |
 | Standalone route header scrolls away | `PageHeader` is `sticky top-0 z-20 bg-bg-dark/80 backdrop-blur-md` so the logo + back link stay pinned inside the scroll container |
@@ -409,9 +418,9 @@ No `.env.local` required for public reads — Sanity dataset is public.
 
 ---
 
-**Last Updated**: June 2026 — **Contact form backend.** Replaced the `/contact` `mailto:` submission with a `submitContact` **server action** (`app/contact/actions.ts`): honeypot field → per-IP in-memory rate limit (3/min) → server-side validation + length caps → send via **Resend** (plain-text, `replyTo` = visitor). `ContactClient.tsx` now renders loading/error/confirmation states. Requires `RESEND_API_KEY` (+ optional `CONTACT_FROM_EMAIL`) — documented in `.env.example`.  
-**Previously**: **SEO + Analytics.** Full SEO layer added: `metadataBase` + title template in `layout.tsx`; per-page Open Graph + Twitter Cards; JSON-LD (`Organization` + `WebSite` on homepage, `BreadcrumbList` on all inner routes); dynamic `app/sitemap.ts` pulling Sanity slugs; `app/robots.ts`; keywords realigned to MERN / Next.js / Sanity / Supabase; `public/logo.jpeg` as default OG image; case study `generateMetadata` now includes per-project OG image. Google Analytics 4 (`G-34753GHP1F`) wired via `next/script afterInteractive`. Domain `pinnaclebyte.dev` verified in GA4 and Google Search Console; sitemap submitted.  
-**Earlier**: **Security audit hardening.** Added `Strict-Transport-Security` (HSTS) + `Content-Security-Policy-Report-Only` + `X-Robots-Tag: noindex` on `/studio`; added `lib/url.ts` `isHttpUrl()` CMS URL guard; removed stray `ADMIN_PASSWORD` from `.env.local`. **Before that**: Testimonials → Trust swap + standalone-route dark rebuild; `/contact`, `/work`, `/work/[slug]` rebuilt in dark theme wired to Sanity; Pricing section added at index 5; Process scrollytelling + GSAP removed.  
+**Last Updated**: June 2026 — **Mobile performance pass.** PageSpeed (mobile, Slow 4G) was 42 with a 14.8s LCP. Fixes: intro headline is now server-rendered with a pure-CSS blur-up reveal (was a JS typewriter that left the LCP element empty until hydration); `NetworkCanvas` is lazy-loaded (`NetworkCanvasLazy`, `ssr:false`), cuts particles on mobile, honours `prefers-reduced-motion`, and pauses via `IntersectionObserver` + `visibilitychange` when offscreen/hidden; removed the unused `gsap` dependency.  
+**Previously**: **Contact form backend.** Replaced the `/contact` `mailto:` submission with a `submitContact` **server action** (`app/contact/actions.ts`): honeypot field → per-IP in-memory rate limit (3/min) → server-side validation + length caps → send via **Resend** (plain-text, `replyTo` = visitor). `ContactClient.tsx` now renders loading/error/confirmation states. Requires `RESEND_API_KEY` (+ optional `CONTACT_FROM_EMAIL`) — documented in `.env.example`.  
+**Earlier**: **SEO + Analytics.** Full SEO layer added: `metadataBase` + title template in `layout.tsx`; per-page Open Graph + Twitter Cards; JSON-LD (`Organization` + `WebSite` on homepage, `BreadcrumbList` on all inner routes); dynamic `app/sitemap.ts` pulling Sanity slugs; `app/robots.ts`; `public/logo.jpeg` as default OG image; case study `generateMetadata` includes per-project OG image. Google Analytics 4 (`G-34753GHP1F`) via `next/script afterInteractive`. Domain `pinnaclebyte.dev` verified in GA4 + Search Console; sitemap submitted. **Before that**: Security audit hardening (HSTS + CSP-Report-Only + `/studio` noindex + `lib/url.ts` guard); Testimonials → Trust swap; standalone-route dark rebuild; Pricing section; Process scrollytelling + GSAP removed.  
 **Dark Theme (Navy + Electric Blue)**: ✅  
 **Animated Backgrounds**: ✅ (dot grid, aurora blobs, network canvas)  
 **Full-Page Snap Scroll**: ✅ (sections 3 & 4 internally scrollable via `internalScrollSections[]`)  
@@ -420,4 +429,5 @@ No `.env.local` required for public reads — Sanity dataset is public.
 **Security Headers**: ✅ (HSTS + CSP-Report-Only + base 5 headers; `/studio` noindex)  
 **SEO**: ✅ (sitemap, robots, OG/Twitter, JSON-LD, GA4)  
 **Contact Form**: ✅ (Resend server action — honeypot + rate limit + validation; needs `RESEND_API_KEY` + verified domain)  
-**Next Task**: Promote `Content-Security-Policy-Report-Only` to an enforced `Content-Security-Policy` once no violations are seen on public routes; replace `public/logo.jpeg` OG image with a proper 1200×630 banner
+**Mobile Performance**: ⏳ (LCP + canvas main-thread fixes shipped — re-run PageSpeed on mobile to confirm the new score; remaining levers are code-splitting below-fold sections and trimming framer-motion usage)  
+**Next Task**: Re-measure mobile PageSpeed; replace `public/logo.jpeg` OG image with a proper 1200×630 banner. (Deferred: promote CSP-Report-Only to enforced — low priority for a portfolio)

@@ -97,7 +97,8 @@ components/
     Navbar.tsx                      # Fixed navbar, hidden on intro, snap-nav on desktop
     PageHeader.tsx                  # Sticky header for standalone routes (/contact, /work) — logo + back link
     Footer.tsx                      # Mobile only
-    NetworkCanvas.tsx               # Particle system (configurable)
+    NetworkCanvas.tsx               # Particle system (configurable; reduced-motion + mobile + offscreen-pause guards)
+    NetworkCanvasLazy.tsx           # next/dynamic ssr:false wrapper — keeps the decorative canvas off the critical render path
     DotGridBackground.tsx           # 18×11 pulsing dot grid
     AuroraBackground.tsx            # 3 drifting blur blobs
   SnapScrollContainer.tsx           # Desktop full-page snap wrapper
