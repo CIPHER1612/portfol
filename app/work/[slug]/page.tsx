@@ -24,12 +24,27 @@ export async function generateMetadata({ params }: WorkCaseStudyProps): Promise<
   const project = await fetchProjectBySlug(slug);
 
   if (!project) {
-    return { title: 'Case study | PinnacleByte' };
+    return { title: 'Case Study' };
   }
 
+  const ogImage = project.image
+    ? [{ url: project.image, alt: project.title }]
+    : [{ url: '/logo.jpeg', width: 1200, height: 630, alt: 'PinnacleByte Web Development Studio' }];
+
   return {
-    title: `${project.title} | PinnacleByte`,
+    title: project.title,
     description: project.summary,
+    openGraph: {
+      url: `/work/${slug}`,
+      title: project.title,
+      description: project.summary,
+      images: ogImage,
+    },
+    twitter: {
+      title: project.title,
+      description: project.summary,
+      images: [ogImage[0].url],
+    },
   };
 }
 
@@ -54,7 +69,22 @@ export default async function WorkCaseStudyPage({ params }: WorkCaseStudyProps) 
   // Only treat the CMS-supplied live URL as a link target if it's http(s).
   const liveUrl = isHttpUrl(project.liveUrl) ? project.liveUrl : undefined;
 
+  const breadcrumbJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://pinnaclebyte.dev' },
+      { '@type': 'ListItem', position: 2, name: 'Work', item: 'https://pinnaclebyte.dev/work' },
+      { '@type': 'ListItem', position: 3, name: project.title, item: `https://pinnaclebyte.dev/work/${slug}` },
+    ],
+  };
+
   return (
+    <>
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+    />
     <main className="relative min-h-[100dvh] overflow-x-hidden bg-bg-dark md:h-[100dvh] md:overflow-y-auto">
       <PageHeader backHref="/work" backLabel="Back to work" />
 
@@ -190,5 +220,6 @@ export default async function WorkCaseStudyPage({ params }: WorkCaseStudyProps) 
         </div>
       </section>
     </main>
+    </>
   );
 }
