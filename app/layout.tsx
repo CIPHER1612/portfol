@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import Script from 'next/script';
 import '../styles/globals.css';
 import LenisProvider from '@/components/LenisProvider';
+
+const GA_ID = 'G-34753GHP1F';
 
 const SITE_URL = 'https://pinnaclebyte.dev';
 
@@ -68,6 +71,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body className="bg-neutral-50 text-primary-900 antialiased">
+        <Script
+          src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
+          strategy="afterInteractive"
+        />
+        <Script id="ga-init" strategy="afterInteractive">
+          {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${GA_ID}');`}
+        </Script>
         <LenisProvider>
           {children}
         </LenisProvider>
